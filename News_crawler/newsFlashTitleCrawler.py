@@ -12,7 +12,7 @@ def crawler(soup):
     return result
 
 def json_maker(result):
-    with open("newsFlashTitle.json", "w", encoding = "utf-8") as f:
+    with open("News_crawler/newsFlashTitle.json", "w", encoding = "utf-8") as f:
         json.dump(result, f, ensure_ascii = False, indent = '\t')
 
 def main():

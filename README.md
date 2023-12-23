@@ -1,2 +1,2 @@
 # MakeSense
- MakeSense
+ MakeSense는 뉴스와 상식을 작문을 통해 배워 문해력을 향상시켜 사람들의 커뮤니케이션 능력을 강화시킵니다.
