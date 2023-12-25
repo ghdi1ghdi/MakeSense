@@ -1,41 +1,51 @@
+# Task 1: Data Collection and Preprocessing
 import json
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import DBSCAN, KMeans
-from sklearn.decomposition import PCA
+import numpy as np
+from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import seaborn as sns
-from keybert import KeyBERT
+import pandas as pd
+import matplotlib.pyplot as plt
 
-# 뉴스 타이틀을 담고 있는 JSON 파일 불러오기
-file_path = '/Users/jack/Documents/GitHub/MakeSense/News_crawler/newsTitle.json'
+file_path = '/Users/jack/Documents/GitHub/MakeSense/News_crawler/newsTitle.json'  # Specify the path to the JSON file containing news titles
 with open(file_path, 'r', encoding='utf-8') as file:
     news_data = json.load(file)
+
 news_titles = [title.strip() for title in news_data if title.strip()]
 
-# Vectorize the news titles using TF-IDF
+# Perform data preprocessing tasks (cleaning, tokenization, lowercase conversion, etc.)
+
+# Task 2: Text Vectorization
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 tfidf_vectorizer = TfidfVectorizer(min_df=3, ngram_range=(1, 5))
 tfidf_vectors = tfidf_vectorizer.fit_transform(news_titles)
 
-# Perform DBSCAN clustering
-dbscan_model = DBSCAN(eps=0.1, min_samples=1, metric='cosine')
-dbscan_labels = dbscan_model.fit_predict(tfidf_vectors)
+def determine_optimal_clusters(vectors):
+    inertias = []
+    for n_clusters in range(2, 300):  # Adjust the range as needed
+        kmeans_model = KMeans(n_clusters=n_clusters)
+        kmeans_model.fit(vectors)
+        inertias.append(kmeans_model.inertia_)
+    plt.plot(range(2, 300), inertias)
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Inertia')
+    plt.title('KMeans Inertia over Different Cluster Counts')
+    plt.show()
 
-# Extract representative articles for each cluster
-def extract_representative_articles(labels, texts):
-    representative_articles = {}
-    for label in set(labels):
-        indices = [i for i, lbl in enumerate(labels) if lbl == label]
-        cluster_texts = [texts[i] for i in indices]
-        representative_articles[label] = max(cluster_texts, key=len)
-    return representative_articles
+# determine_optimal_clusters(tfidf_vectors)
 
-representatives = extract_representative_articles(dbscan_labels, news_titles)
+# Task 3: Apply K-means Clustering
+from sklearn.cluster import KMeans
 
-# ... (other parts of the code remain unchanged)
+kmeans_model = KMeans(n_clusters=300)  # Specify the desired number of clusters
+kmeans_labels = kmeans_model.fit_predict(tfidf_vectors)
 
-# Extract keywords using KeyBERT
-keybert_model = KeyBERT('distilbert-base-nli-mean-tokens')  # specify the model to use
+# Task 4: Keyword Extraction and File Saving
+from keybert import KeyBERT
+
+keybert_model = KeyBERT('distilbert-base-nli-mean-tokens')  # Specify the model to use for keyword extraction
+
 def extract_keywords_for_clusters(labels, texts, num_keywords=5):
     cluster_keywords = {}
     for label in set(labels):
@@ -49,10 +59,8 @@ def extract_keywords_for_clusters(labels, texts, num_keywords=5):
         cluster_keywords[label] = [word for word, _ in keywords]
     return cluster_keywords
 
-# Extract keywords for each cluster
-cluster_keywords = extract_keywords_for_clusters(dbscan_labels, news_titles)
+cluster_keywords = extract_keywords_for_clusters(kmeans_labels, news_titles)
 
-# Save clustering results and keywords to a text file
 def save_results_with_keywords_to_txt(labels, texts, keywords, filepath):
     with open(filepath, 'w', encoding='utf-8') as file:
         for label in set(labels):
@@ -66,35 +74,66 @@ def save_results_with_keywords_to_txt(labels, texts, keywords, filepath):
                 file.write(f"{texts[index]}\n")
             file.write("\n")
 
-# Specify the path to the file where you want to save the results
-output_path = '/Users/jack/Documents/GitHub/MakeSense/AI_model/representative_articles.txt'
-save_results_with_keywords_to_txt(dbscan_labels, news_titles, cluster_keywords, output_path)
+output_path = '/Users/jack/Documents/GitHub/MakeSense/AI_model/cluster_results.txt'  # Specify the path to save the clustering results
+save_results_with_keywords_to_txt(kmeans_labels, news_titles, cluster_keywords, output_path)
 
-# ... (rest of the visualization and KMeans clustering code)
+# Task 5: Generate Sentences Based on Keywords
+import random
+from sklearn.metrics.pairwise import cosine_similarity
+
+def generate_sentences(keywords):
+    generated_sentences = []
+    # Example: Randomly select a cluster
+    # Randomly select one keyword from the cluster
+    random_cluster = random.choice(list(keywords.keys()))
+    random_keyword = keywords[random_cluster]
+    sentence = f"{random_keyword} 해당 뉴스 키워드를 참고하여 작문하시오."
+    generated_sentences.append(sentence)
+    return generated_sentences
+
+keywords = cluster_keywords
+
+generated_sentences = generate_sentences(keywords)
+print(generated_sentences)
+
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Perform PCA for dimensionality reduction
+pca = PCA(n_components=2)  # reduce to 2 dimensions for visualization
+reduced_vectors = pca.fit_transform(tfidf_vectors.toarray())
+
+# Convert cluster labels to integers for color mapping
+kmeans_labels_int = np.array(kmeans_labels, dtype=np.int64)
+
+# Plot the clusters
+plt.figure(figsize=(12, 8))
+sns.scatterplot(x=reduced_vectors[:, 0], y=reduced_vectors[:, 1], hue=kmeans_labels_int, palette='viridis', legend='full')
+plt.title('2D PCA of KMeans Clusters')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.show()
+
+# Plot the cluster centroids
+centroids = pca.transform(kmeans_model.cluster_centers_)
+plt.figure(figsize=(12, 8))
+sns.scatterplot(x=reduced_vectors[:, 0], y=reduced_vectors[:, 1], hue=kmeans_labels_int, palette='viridis', alpha=0.5)
+sns.scatterplot(x=centroids[:, 0], y=centroids[:, 1], s=100, color='black', marker='X', label='Centroids')
+plt.title('2D PCA of KMeans Clusters with Centroids')
+plt.xlabel('PCA Component 1')
+plt.ylabel('PCA Component 2')
+plt.legend()
+plt.show()
 
 
-# Visualize the clusters after reducing dimensionality using PCA
-def visualize_clusters(vectors, labels):
-    pca = PCA(n_components=2)
-    reduced_vectors = pca.fit_transform(vectors.toarray())
-    sns.scatterplot(x=reduced_vectors[:, 0], y=reduced_vectors[:, 1], hue=labels, palette='viridis')
-    plt.show()
+from sklearn.metrics import silhouette_score
 
-visualize_clusters(tfidf_vectors, dbscan_labels)
+# Assuming 'tfidf_vectors' is your vectorized data and 'kmeans_labels' are the labels from KMeans
+# You need to ensure these variables are defined and contain your data and labels
 
-# Determine the optimal number of clusters using KMeans clustering
-def determine_optimal_clusters(vectors):
-    inertias = []
-    for n_clusters in range(2, 20):  # Adjust the range as needed
-        kmeans_model = KMeans(n_clusters=n_clusters)
-        kmeans_model.fit(vectors)
-        inertias.append(kmeans_model.inertia_)
-    plt.plot(range(2, 20), inertias)
-    plt.xlabel('Number of Clusters')
-    plt.ylabel('Inertia')
-    plt.title('KMeans Inertia over Different Cluster Counts')
-    plt.show()
-
-determine_optimal_clusters(tfidf_vectors)
-
-# ... the rest of your code for further tasks ...
+# Calculate silhouette score
+silhouette_avg = silhouette_score(tfidf_vectors, kmeans_labels)
+silhouette_percentage = (silhouette_avg + 1) / 2 * 100
+print("silhouette score", silhouette_percentage, "%")
+# Additional code for visualization, further tasks, etc.

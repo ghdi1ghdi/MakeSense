@@ -28,7 +28,7 @@ def main():
     for i in range(14):  # 14일간의 데이터 수집
         date_str = today.strftime('%Y%m%d')
         base_date_url = base_url + "&date=" + date_str
-        for j in range(19):
+        for i in range(19):
             url = base_date_url + "&page=" + str(i+1)
             print(url)
             req = requests.get(url, headers=custom_header)
